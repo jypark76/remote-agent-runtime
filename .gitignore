@@ -3,6 +3,5 @@ node_modules/
 chats/
 logs/
 relay/assets/
-public/
 *.log
 .DS_Store

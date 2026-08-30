@@ -49,6 +49,8 @@ The relay holds no state beyond in-memory room routing. Everything durable — c
 **Client** (`relay/index.html`)
 - Single-page vanilla JS. Chat list, search, file attachments, conversation rename/delete, storage gauge.
 
+`public/index.html` is the earlier local-only client, served straight off the host before the relay existed. Kept because it still works if you only ever reach the host on your own network and want to skip the relay entirely.
+
 ## Things that turned out to matter
 
 - **Reconnect races.** When the host reconnects, the *old* socket's `close` handler fires after the new one registers. Without an identity check it nulls out the live host. One line, non-obvious bug.

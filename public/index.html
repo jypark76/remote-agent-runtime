@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>remote_claude</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#000;--surface:#1c1c1e;--surface2:#2c2c2e;--accent:#0a84ff;--text:#fff;--sub:#8e8e93;--green:#30d158;--red:#ff453a;--bubble-me:#0a84ff;--bubble-them:#2c2c2e}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+#list-screen{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#list-header{padding:16px 16px 8px;display:flex;justify-content:space-between;align-items:center}
+#list-header h1{font-size:28px;font-weight:700}
+#new-btn{background:var(--accent);color:#fff;border:none;border-radius:50%;width:34px;height:34px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#chat-list{flex:1;overflow-y:auto}
+.chat-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #2c2c2e;cursor:pointer;gap:12px}
+.chat-row:active{background:var(--surface2)}
+.chat-avatar{width:50px;height:50px;border-radius:50%;background:#1a3a5c;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.chat-info{flex:1;min-width:0}
+.chat-title{font-weight:600;font-size:16px}
+.chat-preview{color:var(--sub);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.chat-time{color:var(--sub);font-size:12px;flex-shrink:0}
+#chat-screen{flex:1;display:none;flex-direction:column;overflow:hidden}
+#chat-header{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2c2c2e;background:var(--surface)}
+#back-btn{background:none;border:none;color:var(--accent);font-size:17px;cursor:pointer;padding:0}
+#chat-title-el{flex:1;font-weight:600;font-size:17px;text-align:center}
+#messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.bubble-wrap{display:flex}.bubble-wrap.me{justify-content:flex-end}.bubble-wrap.them{justify-content:flex-start}
+.bubble{max-width:78%;padding:8px 12px;border-radius:18px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.bubble-wrap.me .bubble{background:var(--bubble-me);color:#fff;border-bottom-right-radius:4px}
+.bubble-wrap.them .bubble{background:var(--bubble-them);color:var(--text);border-bottom-left-radius:4px;font-family:'Menlo',monospace;font-size:12px}
+.bubble-ts{font-size:10px;color:var(--sub);margin-top:2px;text-align:right}
+#thinking{display:none;padding:4px 16px 8px;gap:4px}
+#thinking span{width:8px;height:8px;border-radius:50%;background:var(--sub);display:inline-block;animation:bounce 1.2s infinite}
+#thinking span:nth-child(2){animation-delay:.2s}
+#thinking span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+#bottom-bar{background:var(--surface);border-top:1px solid #3a3a3c;padding:8px 12px;padding-bottom:max(8px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px}
+#preview-bar{display:none;align-items:center;gap:8px;padding:4px 0}
+#preview-bar img{height:48px;border-radius:6px}
+#preview-name{font-size:13px;color:var(--sub);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#clear-file{background:none;border:none;color:var(--red);font-size:20px;cursor:pointer}
+#input-row{display:flex;align-items:flex-end;gap:8px}
+#photo-btn,#file-btn{background:none;border:none;font-size:26px;cursor:pointer;padding:4px;flex-shrink:0}
+#msg-input{flex:1;background:var(--surface2);border:none;border-radius:20px;padding:9px 14px;color:var(--text);font-size:15px;outline:none;resize:none;max-height:120px;line-height:1.4}
+#send-btn{background:var(--accent);border:none;border-radius:50%;width:34px;height:34px;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+#send-btn:disabled{background:var(--surface2);color:var(--sub)}
+#file-input{display:none}
+.file-attach{display:inline-flex;align-items:center;gap:8px;background:#1c3a5c;border-radius:12px;padding:8px 12px;margin:2px 0;text-decoration:none;color:#4db8ff;font-size:13px;max-width:100%;overflow:hidden}
+.file-attach-icon{font-size:20px;flex-shrink:0}
+.file-attach-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="list-screen">
+  <div id="list-header"><h1>remote_claude</h1><button id="new-btn">+</button></div>
+  <div id="chat-list"></div>
+</div>
+<div id="chat-screen">
+  <div id="chat-header">
+    <button id="back-btn">&#8249; Back</button>
+    <span id="chat-title-el"></span>
+    <span style="width:50px"></span>
+  </div>
+  <div id="messages"></div>
+  <div id="thinking"><span></span><span></span><span></span></div>
+  <div id="bottom-bar">
+    <div id="preview-bar">
+      <img id="preview-img" src="" alt="">
+      <span id="preview-name"></span>
+      <button id="clear-file">&#x2715;</button>
+    </div>
+    <div id="input-row">
+      <button id="photo-btn">&#128247;</button>
+      <button id="file-btn">&#128206;</button>
+      <textarea id="msg-input" placeholder="Message..." rows="1"></textarea>
+      <button id="send-btn" disabled>&#8593;</button>
+      <input type="file" id="file-input">
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const listScreen=$('list-screen'),chatScreen=$('chat-screen');
+const chatListEl=$('chat-list'),messagesEl=$('messages');
+const msgInput=$('msg-input'),sendBtn=$('send-btn');
+const previewBar=$('preview-bar'),previewImg=$('preview-img'),previewName=$('preview-name');
+let currentChat=null,ws=null,selectedFile=null,thinking=false;
+const thinkingEl=$('thinking');
+function setThinking(on){
+  thinking=on;
+  thinkingEl.style.display=on?'flex':'none';
+  sendBtn.disabled=on||(!msgInput.value.trim()&&!selectedFile);
+  if(on)messagesEl.scrollTop=messagesEl.scrollHeight;
+}
+function timeAgo(ts){return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+function addBubble(role,text,ts){
+  if(!text.trim())return;
+  const wrap=document.createElement('div');wrap.className='bubble-wrap '+(role==='user'?'me':'them');
+  const bub=document.createElement('div');bub.className='bubble';bub.textContent=text;
+  const t=document.createElement('div');t.className='bubble-ts';t.textContent=timeAgo(ts||Date.now());
+  wrap.appendChild(bub);wrap.appendChild(t);messagesEl.appendChild(wrap);
+  messagesEl.scrollTop=messagesEl.scrollHeight;
+}
+async function loadList(){
+  const chats=await fetch('/api/chats').then(r=>r.json());
+  chatListEl.innerHTML='';
+  if(!chats.length){chatListEl.innerHTML='<p style="color:#8e8e93;text-align:center;padding:40px 20px">No chats yet.<br>Tap + to start one.</p>';return;}
+  for(const c of chats){
+    const row=document.createElement('div');row.className='chat-row';
+    row.innerHTML='<div class="chat-avatar">&#129302;</div><div class="chat-info"><div class="chat-title">'+c.title+'</div><div class="chat-preview">'+(c.preview||'No messages yet')+'</div></div><div class="chat-time">'+timeAgo(c.updatedAt)+'</div>';
+    row.onclick=()=>openChat(c.id);chatListEl.appendChild(row);
+  }
+}
+async function openChat(id){
+  const chat=await fetch('/api/chats/'+id).then(r=>r.json());
+  currentChat=chat;$('chat-title-el').textContent=chat.title;
+  messagesEl.innerHTML='';
+  let batch=null;
+  for(const m of chat.messages){
+    if(batch&&batch.role===m.role){batch.text+=m.text;batch.ts=m.ts;}
+    else{if(batch)addBubble(batch.role,batch.text,batch.ts);batch={role:m.role,text:m.text,ts:m.ts};}
+  }
+  if(batch)addBubble(batch.role,batch.text,batch.ts);
+  listScreen.style.display='none';chatScreen.style.display='flex';
+  connectWS(id);
+}
+let outputBuffer='',outputTimer=null;
+function stripAnsi(s){
+  return s
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g,'')
+    .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g,'')
+    .replace(/\x1b[^[\]]/g,'')
+    .replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g,'')
+    .replace(/[^\n]*\r(?!\n)/g,'')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,'');
+}
+function flushOutput(){
+  const text=outputBuffer.trim();
+  outputBuffer='';
+  // filter lines that are just the prompt
+  const meaningful=text.split('\n').filter(l=>!/^\s*[>❯]\s*$/.test(l)).join('\n').trim();
+  if(meaningful){addBubble('claude',meaningful,Date.now());}
+  setThinking(false);
+}
+function connectWS(chatId){
+  if(ws){ws.onmessage=null;ws.close();}
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(proto+'://'+location.host);
+  ws.onopen=()=>ws.send(JSON.stringify({type:'join',chatId}));
+  ws.onmessage=e=>{
+    const msg=JSON.parse(e.data);
+    if(msg.type==='output'){
+      const clean=stripAnsi(msg.data);
+      if(!clean.trim())return;
+      outputBuffer+=clean;
+      clearTimeout(outputTimer);
+      // flush immediately when we see the prompt (Claude is done)
+      const done=/^\s*[>❯]\s*$/m.test(clean);
+      outputTimer=setTimeout(flushOutput, done?100:1200);
+    }
+    if(msg.type==='files_update'&&msg.chatId===currentChat?.id){
+      for(const fname of msg.files) addFileAttachment(fname);
+    }
+  };
+  ws.onclose=()=>setTimeout(()=>{if(currentChat)connectWS(currentChat.id);},2000);
+}
+async function doSend(){
+  const text=msgInput.value.trim();if(!currentChat)return;
+  if(selectedFile){
+    if(selectedFile.type.startsWith('image/')){
+      addBubble('user',(text?text+'\n':'')+selectedFile.name,Date.now());
+    } else {
+      const wrap=document.createElement('div');wrap.className='bubble-wrap me';
+      const inner=document.createElement('div');inner.style.cssText='display:flex;flex-direction:column;align-items:flex-end;gap:4px';
+      if(text){const tb=document.createElement('div');tb.className='bubble';tb.textContent=text;inner.appendChild(tb);}
+      const a=document.createElement('div');
+      a.className='file-attach';a.style.background='#0a5a8a';
+      a.innerHTML='<span class="file-attach-icon">'+fileIcon(selectedFile.name)+'</span><span class="file-attach-name">'+selectedFile.name+'</span>';
+      const t=document.createElement('div');t.className='bubble-ts';t.textContent=timeAgo(Date.now());
+      inner.appendChild(a);inner.appendChild(t);wrap.appendChild(inner);messagesEl.appendChild(wrap);
+      messagesEl.scrollTop=messagesEl.scrollHeight;
+    }
+    const fd=new FormData();fd.append('file',selectedFile);if(text)fd.append('message',text);
+    await fetch('/api/chats/'+currentChat.id+'/upload',{method:'POST',body:fd});
+    clearFile();
+    setThinking(true);
+  }else if(text){
+    addBubble('user',text,Date.now());
+    ws.send(JSON.stringify({type:'input',data:text+'\n'}));
+    setThinking(true);
+  }
+  msgInput.value='';updateSend();
+}
+function updateSend(){if(!thinking)sendBtn.disabled=!msgInput.value.trim()&&!selectedFile;}
+msgInput.addEventListener('input',()=>{msgInput.style.height='auto';msgInput.style.height=Math.min(msgInput.scrollHeight,120)+'px';updateSend();});
+msgInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSend();}});
+sendBtn.onclick=doSend;
+$('photo-btn').onclick=()=>{$('file-input').setAttribute('accept','image/*;capture=camera');$('file-input').click();};
+$('file-btn').onclick=()=>{$('file-input').setAttribute('accept','*/*');$('file-input').click();};
+$('file-input').onchange=()=>{
+  selectedFile=$('file-input').files[0];if(!selectedFile)return;
+  if(selectedFile.type.startsWith('image/')){previewImg.src=URL.createObjectURL(selectedFile);previewImg.style.display='block';}
+  else previewImg.style.display='none';
+  previewName.textContent=selectedFile.name;previewBar.style.display='flex';$('file-input').value='';updateSend();
+};
+$('clear-file').onclick=clearFile;
+function clearFile(){selectedFile=null;previewBar.style.display='none';previewImg.src='';updateSend();}
+function fileIcon(name){const ext=name.split('.').pop().toLowerCase();return{xlsx:'📊',xls:'📊',csv:'📊',pdf:'📄',docx:'📝',doc:'📝',pptx:'📋',ppt:'📋',zip:'📦',png:'🖼️',jpg:'🖼️',jpeg:'🖼️',gif:'🖼️',txt:'📃',md:'📃',json:'📃',py:'📃',sh:'📃',sdlxliff:'🌐'}[ext]||'📎';}
+function addFileAttachment(filename){
+  const wrap=document.createElement('div');wrap.className='bubble-wrap them';
+  const a=document.createElement('a');
+  a.className='file-attach';
+  a.href='/api/chats/'+currentChat.id+'/files/'+encodeURIComponent(filename);
+  a.download=filename;
+  a.innerHTML='<span class="file-attach-icon">'+fileIcon(filename)+'</span><span class="file-attach-name">'+filename+'</span>';
+  wrap.appendChild(a);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop=messagesEl.scrollHeight;
+}
+$('back-btn').onclick=()=>{if(ws)ws.close();currentChat=null;chatScreen.style.display='none';listScreen.style.display='flex';loadList();};
+$('new-btn').onclick=async()=>{
+  const title=prompt('Chat name (or leave blank):')||('Chat '+new Date().toLocaleString());
+  const chat=await fetch('/api/chats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title})}).then(r=>r.json());
+  openChat(chat.id);
+};
+loadList();
+</script>
+</body>
+</html>
